@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import myData from "../data.json";
 import Filterbar from "./Filterbar";
 import Filtered from "./Filtered";
@@ -7,13 +7,50 @@ import { v4 as uuidv4 } from "uuid";
 const FILTER_TYPES = {
   level: "LEVEL",
   role: "ROLE",
-  tools: "TOOLS",
+  tool: "TOOLS",
   language: "LANGUAGE",
+};
+
+const shouldDisplayItem = ({ role, languages, tools, level }, groupedFilters) => {
+  let shouldDisplay = true;
+
+  const itemData = {
+    [FILTER_TYPES.tool]: [...tools],
+    [FILTER_TYPES.language]: [...languages],
+    [FILTER_TYPES.role]: [role],
+    [FILTER_TYPES.level]: [level],
+  };
+
+  Object.keys(groupedFilters).forEach((filterKey) => {
+    const result = groupedFilters[filterKey].every((filterValue) => (
+      itemData[filterKey].includes(filterValue)
+    ));
+    shouldDisplay = shouldDisplay && result;
+  })
+
+  return shouldDisplay;
 };
 
 const Hero = () => {
   const [isFilterOpen, setFilter] = useState(false);
   const [filterContainer, setFilterContainer] = useState([]);
+  const groupedFilters = useMemo(() => {
+    return filterContainer.reduce((filterGroup, currentFilter) => {
+      const currentType = currentFilter.type;
+
+      if (filterGroup.hasOwnProperty(currentType)) {
+        return {
+          ...filterGroup,
+          [currentType]: [...filterGroup[currentType], currentFilter.value],
+        };
+      }
+
+      return {
+        ...filterGroup,
+        [currentType]: [currentFilter.value],
+      };
+    }, { });
+  }, [filterContainer]);
 
   const handleClick = (e) => {
     setFilter(true);
@@ -45,6 +82,11 @@ const Hero = () => {
   };
 
   const handleRemoveItem = (id) => {
+    if (filterContainer.length === 1) {
+      handleClear();
+      return;
+    }
+
     // To remove an item filter item id
     const filteredItems = filterContainer.filter(
       (filterItem) => filterItem.id !== id
@@ -86,114 +128,9 @@ const Hero = () => {
           postedAt,
         } = item;
 
-        if (filterContainer.length >= 1) {
-          return (
-            <>
-              {filterContainer.map((item, index) => {
-                if (index === id) return;
+        const shouldDisplay = shouldDisplayItem({ role, languages, tools, level }, groupedFilters);
 
-                if (
-                  tools.includes(item.value) ||
-                  languages.includes(item.value) ||
-                  level.includes(item.value) ||
-                  role.includes(item.value)
-                ) {
-                  return (
-                    <div
-                      className={`single-card row ${
-                        company === "Photosnap" || company === "Manage"
-                          ? "side"
-                          : null
-                      }`}
-                      key={index}
-                    >
-                      <div className='info-container'>
-                        <div className='img-container'>
-                          <img src={logo} alt={company} />
-                        </div>
-
-                        <article className='general-info '>
-                          <div className='company'>
-                            <p>{company}</p>
-                            {recently && <span className='new'>NEW!</span>}
-                            {featured && (
-                              <span className='featured'>FEATURED</span>
-                            )}
-                          </div>
-
-                          <h3>{position}</h3>
-
-                          <div className='sub-info'>
-                            <span>{postedAt}</span>
-                            <span className='bullet'>{contract}</span>
-                            <span className='bullet'>{location}</span>
-                          </div>
-                        </article>
-                      </div>
-
-                      <div className='tags'>
-                        <ul>
-                          <li className='tag'>
-                            <button
-                              type='button'
-                              className='btn'
-                              onClick={handleClick}
-                              name='role'
-                            >
-                              {role}
-                            </button>
-                          </li>
-                          <li className='tag'>
-                            <button
-                              type='button'
-                              className='btn'
-                              onClick={handleClick}
-                              name='level'
-                            >
-                              {level}
-                            </button>
-                          </li>
-
-                          {tools.map((tool, index) => {
-                            return (
-                              <li className='tag' key={index}>
-                                <button
-                                  type='button'
-                                  className='btn'
-                                  name='tool'
-                                  onClick={handleClick}
-                                >
-                                  {tool}
-                                </button>
-                              </li>
-                            );
-                          })}
-
-                          {languages.map((tool, index) => {
-                            return (
-                              <li className='tag' key={index}>
-                                <button
-                                  type='button'
-                                  className='btn'
-                                  name='language'
-                                  onClick={handleClick}
-                                >
-                                  {tool}
-                                </button>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </div>
-                    </div>
-                  );
-                }
-              })}
-            </>
-          );
-        }
-
-        if (filterContainer.length === 0)
+        if (shouldDisplay) {
           return (
             <div
               className={`single-card row ${
@@ -279,6 +216,9 @@ const Hero = () => {
               </div>
             </div>
           );
+        }
+
+        return null;
       })}
     </section>
   );
